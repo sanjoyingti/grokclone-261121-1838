@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -42,22 +43,21 @@ class ChatApi(private val client: OkHttpClient) {
         if (apiKey.isNotBlank()) {
             builder.header("Authorization", "Bearer $apiKey")
         }
+
         val call = client.newCall(builder.build())
         val cancelHandle = coroutineContext[Job]?.invokeOnCompletion { call.cancel() }
+
         try {
-            call.execute().use { response ->
-                if (!response.isSuccessful) {
-                    val raw = try {
-                        response.body?.string().orEmpty()
-                    } catch (e: Exception) {
-                        ""
-                    }
+            val response: Response = call.execute()
+            response.use { open ->
+                if (!open.isSuccessful) {
+                    val raw = safeBodyString(open.body)
                     if (call.isCanceled()) {
                         throw CancellationException("Stopped by the user")
                     }
-                    throw ApiException(describeStatus(response.code, raw), response.code)
+                    throw ApiException(describeStatus(open.code, raw), open.code)
                 }
-                if (stream) readStream(response, onDelta) else readPlain(response)
+                if (stream) readStream(open.body, onDelta) else readPlain(open.body)
             }
         } catch (e: CancellationException) {
             throw e
@@ -76,8 +76,28 @@ class ChatApi(private val client: OkHttpClient) {
         }
     }
 
+    /**
+     * The reply body type differs between the two major versions of the HTTP library
+     * (nullable in 4.x, non-null in 5.x). Storing it in a nullable local variable keeps
+     * this file compiling and behaving identically with either of them.
+     */
+    private fun nullableBody(response: Response): ResponseBody? {
+        val body: ResponseBody? = response.body
+        return body
+    }
+
+    private fun safeBodyString(response: Response): String {
+        val body = nullableBody(response) ?: return ""
+        return try {
+            body.string()
+        } catch (e: IOException) {
+            ""
+        }
+    }
+
     private suspend fun readStream(response: Response, onDelta: (String) -> Unit): String {
-        val body = response.body ?: throw ApiException("The server returned an empty response.")
+        val body = nullableBody(response)
+            ?: throw ApiException("The server returned an empty response.")
         val source = body.source()
         val collected = StringBuilder()
         while (true) {
@@ -106,8 +126,10 @@ class ChatApi(private val client: OkHttpClient) {
     }
 
     private fun readPlain(response: Response): String {
+        val body = nullableBody(response)
+            ?: throw ApiException("The server returned an empty response.")
         val raw = try {
-            response.body?.string().orEmpty()
+            body.string()
         } catch (e: IOException) {
             throw mapIoException(e)
         }
@@ -150,7 +172,8 @@ class ChatApi(private val client: OkHttpClient) {
     private fun extractErrorMessage(raw: String): String {
         if (raw.isBlank()) return ""
         return try {
-            val root = com.arin.grokclone.model.chatJson.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonObject
+            val root = com.arin.grokclone.model.chatJson
+                .parseToJsonElement(raw) as? kotlinx.serialization.json.JsonObject
             val error = root?.get("error")
             when (error) {
                 is kotlinx.serialization.json.JsonObject ->
