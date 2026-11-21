@@ -6,11 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
 
 val chatJson: Json = Json {
     ignoreUnknownKeys = true
@@ -24,6 +20,19 @@ data class OutgoingMessage(
     val imageBase64: String? = null
 )
 
+/**
+ * Builds a JSON object from plain pairs. Doing it this way avoids depending on the
+ * opt-in builder helpers (buildJsonObject / put / add), which differ between versions
+ * of the serialization library and were breaking the compile.
+ */
+private fun jsonObjectOf(vararg pairs: Pair<String, JsonElement>): JsonObject {
+    val map = LinkedHashMap<String, JsonElement>(pairs.size)
+    for ((key, value) in pairs) {
+        map[key] = value
+    }
+    return JsonObject(map)
+}
+
 fun buildChatRequest(
     model: String,
     messages: List<OutgoingMessage>,
@@ -31,51 +40,43 @@ fun buildChatRequest(
     maxTokens: Int,
     stream: Boolean
 ): String {
-    val root = buildJsonObject {
-        put("model", model.ifBlank { "gpt-4o-mini" })
-        put(
-            "messages",
-            buildJsonArray {
-                messages.forEach { m ->
-                    add(
-                        buildJsonObject {
-                            put("role", m.role)
-                            if (m.imageBase64.isNullOrBlank()) {
-                                put("content", m.content)
-                            } else {
-                                put(
-                                    "content",
-                                    buildJsonArray {
-                                        add(
-                                            buildJsonObject {
-                                                put("type", "text")
-                                                put("text", m.content)
-                                            }
-                                        )
-                                        add(
-                                            buildJsonObject {
-                                                put("type", "image_url")
-                                                put(
-                                                    "image_url",
-                                                    buildJsonObject {
-                                                        put("url", "data:image/jpeg;base64,${m.imageBase64}")
-                                                    }
-                                                )
-                                            }
-                                        )
-                                    }
-                                )
-                            }
-                        }
+    val encodedMessages: List<JsonElement> = messages.map { message ->
+        val role = JsonPrimitive(message.role)
+        val image = message.imageBase64
+        if (image.isNullOrBlank()) {
+            jsonObjectOf(
+                "role" to role,
+                "content" to JsonPrimitive(message.content)
+            )
+        } else {
+            val parts = JsonArray(
+                listOf(
+                    jsonObjectOf(
+                        "type" to JsonPrimitive("text"),
+                        "text" to JsonPrimitive(message.content)
+                    ),
+                    jsonObjectOf(
+                        "type" to JsonPrimitive("image_url"),
+                        "image_url" to jsonObjectOf(
+                            "url" to JsonPrimitive("data:image/jpeg;base64,$image")
+                        )
                     )
-                }
-            }
-        )
-        put("temperature", temperature)
-        put("max_tokens", maxTokens)
-        put("stream", stream)
+                )
+            )
+            jsonObjectOf(
+                "role" to role,
+                "content" to parts
+            )
+        }
     }
-    return root.toString()
+
+    return jsonObjectOf(
+        "model" to JsonPrimitive(model.ifBlank { "gpt-4o-mini" }),
+        "messages" to JsonArray(encodedMessages),
+        "temperature" to JsonPrimitive(temperature),
+        "max_tokens" to JsonPrimitive(maxTokens),
+        "stream" to JsonPrimitive(stream)
+    ).toString()
 }
 
 private fun contentToText(element: JsonElement?): String {
@@ -84,7 +85,7 @@ private fun contentToText(element: JsonElement?): String {
         is JsonPrimitive -> element.content
         is JsonArray -> element.joinToString("") { part ->
             val obj = (part as? JsonObject) ?: return@joinToString ""
-            when (obj["type"]?.let { (it as? JsonPrimitive)?.content }) {
+            when ((obj["type"] as? JsonPrimitive)?.content) {
                 "text" -> (obj["text"] as? JsonPrimitive)?.content ?: ""
                 "output_text" -> (obj["text"] as? JsonPrimitive)?.content ?: ""
                 else -> ""

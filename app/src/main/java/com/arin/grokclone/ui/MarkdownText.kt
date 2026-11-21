@@ -188,8 +188,7 @@ fun buildInlineMarkdown(
                     if (closeBracket > 0 && openParen == closeBracket + 1 && closeParen > openParen) {
                         val label = text.substring(index + 1, closeBracket)
                         val url = text.substring(openParen + 1, closeParen)
-                        // Plain LinkAnnotation.Url keeps this working on every Compose version.
-                        withLink(LinkAnnotation.Url(url = url)) {
+                        withLink(LinkAnnotation.Url(url)) {
                             withStyle(SpanStyle(color = linkColor)) {
                                 append(label)
                             }
