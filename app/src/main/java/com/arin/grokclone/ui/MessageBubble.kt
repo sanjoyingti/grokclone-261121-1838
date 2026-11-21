@@ -1,9 +1,7 @@
 package com.arin.grokclone.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,7 +63,6 @@ fun formatDay(timestamp: Long): String {
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(timestamp))
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
     message: MessageEntity,
@@ -105,10 +103,11 @@ fun MessageBubble(
                 ),
                 modifier = Modifier
                     .widthIn(max = 330.dp)
-                    .combinedClickable(
-                        onClick = { },
-                        onLongClick = { menuOpen = true }
-                    )
+                    .pointerInput(message.id) {
+                        detectTapGestures(
+                            onLongPress = { menuOpen = true }
+                        )
+                    }
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (!message.imageBase64.isNullOrBlank()) {
