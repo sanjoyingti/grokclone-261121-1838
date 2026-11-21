@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -24,13 +23,14 @@ import com.arin.grokclone.ui.ChatScreen
 import com.arin.grokclone.ui.SettingsScreen
 import com.arin.grokclone.ui.theme.GrokCloneTheme
 import com.arin.grokclone.viewmodel.ChatViewModel
-import com.arin.grokclone.viewmodel.SettingsViewModel
+
+private const val ROUTE_CHAT = "chat"
+private const val ROUTE_SETTINGS = "settings"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setTheme(R.style.Theme_GrokClone)
         setContent {
             GrokCloneRoot()
         }
@@ -40,37 +40,33 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun GrokCloneRoot() {
     val chatViewModel: ChatViewModel = viewModel()
-    val settingsViewModel: SettingsViewModel = viewModel()
     val state by chatViewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     var autoNavigated by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(state.settingsLoaded) {
+        if (state.settingsLoaded && !autoNavigated && state.settings.apiKey.isBlank()) {
+            autoNavigated = true
+            navController.navigate(ROUTE_SETTINGS)
+        }
+    }
 
     GrokCloneTheme(darkTheme = state.settings.darkTheme) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            NavHost(navController = navController, startDestination = "chat") {
-                composable("chat") {
+            NavHost(navController = navController, startDestination = ROUTE_CHAT) {
+                composable(ROUTE_CHAT) {
                     ChatScreen(
                         viewModel = chatViewModel,
-                        onOpenSettings = { navController.navigate("settings") }
+                        onOpenSettings = { navController.navigate(ROUTE_SETTINGS) }
                     )
                 }
-                composable("settings") {
-                    SettingsScreen(
-                        viewModel = settingsViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                composable(ROUTE_SETTINGS) {
+                    SettingsScreen(onBack = { navController.popBackStack() })
                 }
             }
-        }
-    }
-
-    LaunchedEffect(state.settingsLoaded) {
-        if (state.settingsLoaded && !autoNavigated && state.settings.apiKey.isBlank()) {
-            autoNavigated = true
-            navController.navigate("settings")
         }
     }
 }

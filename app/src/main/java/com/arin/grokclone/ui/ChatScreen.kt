@@ -114,7 +114,7 @@ fun ChatScreen(
         viewModel.dismissSnackbar()
     }
 
-    // Keeps the newest message in view. The list is laid out bottom-anchored, so item 0 is the latest one.
+    // The list is laid out bottom-anchored, so item 0 is always the newest bubble.
     LaunchedEffect(state.currentConversationId, state.messages.size, state.isGenerating) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(0)
@@ -128,8 +128,7 @@ fun ChatScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(300.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface
+                modifier = Modifier.width(300.dp)
             ) {
                 ConversationDrawer(
                     conversations = state.conversations,

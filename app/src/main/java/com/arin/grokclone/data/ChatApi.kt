@@ -51,13 +51,13 @@ class ChatApi(private val client: OkHttpClient) {
             val response: Response = call.execute()
             response.use { open ->
                 if (!open.isSuccessful) {
-                    val raw = safeBodyString(open.body)
+                    val raw = safeBodyString(open)
                     if (call.isCanceled()) {
                         throw CancellationException("Stopped by the user")
                     }
                     throw ApiException(describeStatus(open.code, raw), open.code)
                 }
-                if (stream) readStream(open.body, onDelta) else readPlain(open.body)
+                if (stream) readStream(open, onDelta) else readPlain(open)
             }
         } catch (e: CancellationException) {
             throw e
@@ -78,16 +78,13 @@ class ChatApi(private val client: OkHttpClient) {
 
     /**
      * The reply body type differs between the two major versions of the HTTP library
-     * (nullable in 4.x, non-null in 5.x). Storing it in a nullable local variable keeps
-     * this file compiling and behaving identically with either of them.
+     * (nullable in 4.x, non-null in 5.x). Returning it into a nullable slot keeps this
+     * file compiling and behaving identically with either of them.
      */
-    private fun nullableBody(response: Response): ResponseBody? {
-        val body: ResponseBody? = response.body
-        return body
-    }
+    private fun bodyOrNull(response: Response): ResponseBody? = response.body
 
     private fun safeBodyString(response: Response): String {
-        val body = nullableBody(response) ?: return ""
+        val body = bodyOrNull(response) ?: return ""
         return try {
             body.string()
         } catch (e: IOException) {
@@ -96,7 +93,7 @@ class ChatApi(private val client: OkHttpClient) {
     }
 
     private suspend fun readStream(response: Response, onDelta: (String) -> Unit): String {
-        val body = nullableBody(response)
+        val body = bodyOrNull(response)
             ?: throw ApiException("The server returned an empty response.")
         val source = body.source()
         val collected = StringBuilder()
@@ -126,7 +123,7 @@ class ChatApi(private val client: OkHttpClient) {
     }
 
     private fun readPlain(response: Response): String {
-        val body = nullableBody(response)
+        val body = bodyOrNull(response)
             ?: throw ApiException("The server returned an empty response.")
         val raw = try {
             body.string()

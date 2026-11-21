@@ -2,13 +2,13 @@ package com.arin.grokclone.model
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
@@ -78,10 +78,10 @@ fun buildChatRequest(
     return root.toString()
 }
 
-private fun contentToText(element: kotlinx.serialization.json.JsonElement?): String {
+private fun contentToText(element: JsonElement?): String {
     return when (element) {
         null, is JsonNull -> ""
-        is JsonPrimitive -> if (element.isString) element.content else element.content
+        is JsonPrimitive -> element.content
         is JsonArray -> element.joinToString("") { part ->
             val obj = (part as? JsonObject) ?: return@joinToString ""
             when (obj["type"]?.let { (it as? JsonPrimitive)?.content }) {
@@ -111,7 +111,7 @@ fun extractFullContent(payload: String): String {
         val root = chatJson.parseToJsonElement(payload).jsonObject
         val choices = (root["choices"] as? JsonArray) ?: return ""
         val first = (choices.firstOrNull() as? JsonObject) ?: return ""
-        val message = (first["message"] as? JsonObject)
+        val message = first["message"] as? JsonObject
         if (message != null) {
             contentToText(message["content"])
         } else {

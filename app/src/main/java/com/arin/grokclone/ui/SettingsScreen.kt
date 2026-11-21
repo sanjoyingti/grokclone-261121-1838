@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arin.grokclone.data.AppSettings
 import com.arin.grokclone.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -56,8 +57,8 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val testResult by viewModel.testResult.collectAsStateWithLifecycle()
@@ -81,7 +82,7 @@ fun SettingsScreen(
     val maxTokensValid = parsedMaxTokens != null && parsedMaxTokens in 1..200_000
     val baseUrlValid = baseUrl.trim().isNotEmpty()
 
-    fun currentMaxTokens(): Int = if (maxTokensValid) parsedMaxTokens!! else settings.maxTokens
+    fun currentMaxTokens(): Int = if (maxTokensValid) parsedMaxTokens ?: settings.maxTokens else settings.maxTokens
 
     fun saveAll() {
         viewModel.saveAll(
