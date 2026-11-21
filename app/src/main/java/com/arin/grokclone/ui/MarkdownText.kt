@@ -31,12 +31,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -190,18 +188,11 @@ fun buildInlineMarkdown(
                     if (closeBracket > 0 && openParen == closeBracket + 1 && closeParen > openParen) {
                         val label = text.substring(index + 1, closeBracket)
                         val url = text.substring(openParen + 1, closeParen)
-                        withLink(
-                            LinkAnnotation.Url(
-                                url = url,
-                                styles = TextLinkStyles(
-                                    style = SpanStyle(
-                                        color = linkColor,
-                                        textDecoration = TextDecoration.Underline
-                                    )
-                                )
-                            )
-                        ) {
-                            append(label)
+                        // Plain LinkAnnotation.Url keeps this working on every Compose version.
+                        withLink(LinkAnnotation.Url(url = url)) {
+                            withStyle(SpanStyle(color = linkColor)) {
+                                append(label)
+                            }
                         }
                         index = closeParen + 1
                     } else {

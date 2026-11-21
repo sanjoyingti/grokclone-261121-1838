@@ -128,6 +128,7 @@ fun ChatScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
+                drawerState = drawerState,
                 modifier = Modifier.width(300.dp),
                 drawerContainerColor = MaterialTheme.colorScheme.surface
             ) {

@@ -78,7 +78,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _state.map { it.currentConversationId }
                 .distinctUntilChanged()
                 .flatMapLatest { id ->
-                    if (id == null) flowOf(emptyList()) else dao.observeMessages(id)
+                    if (id == null) {
+                        flowOf(emptyList<MessageEntity>())
+                    } else {
+                        dao.observeMessages(id)
+                    }
                 }
                 .collect { messages ->
                     _state.update { it.copy(messages = messages) }
@@ -224,7 +228,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun generate(conversationId: Long, settings: AppSettings) {
         val rows = dao.getMessages(conversationId)
-        val history = rows
+        val history: List<OutgoingMessage> = rows
             .filter { it.role == "user" || it.role == "assistant" }
             .filter { !it.isError }
             .filter { it.content.isNotBlank() || !it.imageBase64.isNullOrBlank() }
@@ -232,7 +236,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         if (history.isEmpty()) return
 
-        val outgoing = if (settings.systemPrompt.isBlank()) {
+        val outgoing: List<OutgoingMessage> = if (settings.systemPrompt.isBlank()) {
             history
         } else {
             listOf(OutgoingMessage("system", settings.systemPrompt)) + history
